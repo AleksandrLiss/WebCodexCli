@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101312"><title>Codex Workspace</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23baf5ce'/%3E%3Ctext x='9' y='44' font-size='38' font-family='monospace'%3E%3E_%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/vendor/xterm.css"><link rel="stylesheet" href="/static/style.css">
+  <script src="/static/vendor/xterm.js" defer></script><script src="/static/vendor/addon-fit.js" defer></script><script src="/static/app.js" defer></script>
+</head>
+<body>
+  <section id="login-screen" class="login-screen" hidden>
+    <form id="login-form" class="login-card">
+      <div class="brand-icon large">&gt;_</div><p class="eyebrow">YOUR DEVELOPMENT SPACE</p>
+      <h1>Добро пожаловать<br>в Codex Workspace</h1><p class="muted">Терминал, задачи и код — в вашем браузере.</p>
+      <label for="password">Пароль доступа</label><input id="password" type="password" autocomplete="current-password" required placeholder="Введите пароль сервера">
+      <p id="login-error" role="alert" class="error"></p><button class="primary" type="submit">Открыть пространство <span>↗</span></button>
+      <p class="login-note">Личное рабочее пространство · Codex CLI</p>
+    </form>
+  </section>
+  <div id="app" class="app" hidden>
+    <aside class="sidebar">
+      <a class="brand" href="/"><span class="brand-icon">&gt;_</span><span>codex<span class="brand-sub">workspace</span></span></a>
+      <button id="new-session" class="primary"><span>＋</span> Новая сессия <kbd>N</kbd></button>
+      <div class="section-label">СЕССИИ <span id="session-count">0</span></div>
+      <div id="session-list" class="session-list"></div>
+      <div class="sidebar-bottom"><div class="workspace-label">РАБОЧАЯ ПАПКА</div><div class="workspace-path">▱ /workspace</div><p>Файлы и история Codex сохраняются между запусками.</p><button id="logout" class="text-button">Выйти из пространства ↗</button></div>
+    </aside>
+    <main>
+      <header><div class="breadcrumb">Пространство <span>/</span> <strong id="page-title">Обзор</strong></div><div class="connection"><span id="connection-dot" class="dot"></span><span id="connection-label">Готов к работе</span></div></header>
+      <section id="welcome" class="welcome">
+        <div class="eyebrow"><span class="tiny-line"></span> CODEX В ВАШЕМ БРАУЗЕРЕ</div><h1>Меньше рутины.<br><span>Больше готового кода.</span></h1><p class="intro">Работайте с консольным Codex в привычном терминале.<br>Создайте сессию и расскажите, что нужно сделать.</p>
+        <div class="welcome-actions"><button class="primary" id="start-codex">Запустить Codex <span>↗</span></button><button class="secondary" id="start-shell">Открыть терминал <span>⌘</span></button></div>
+        <div class="cards"><article><span class="card-icon">01 /</span><h3>Задайте направление</h3><p>Опишите задачу обычными словами. Codex изучит проект и предложит изменения.</p></article><article><span class="card-icon">02 /</span><h3>Оставайтесь в контексте</h3><p>Переключайтесь между сессиями. При обновлении страницы работа продолжается.</p></article><article><span class="card-icon">03 /</span><h3>Управляйте процессом</h3><p>Проверяйте команды, подтверждайте действия и следите за результатом в реальном времени.</p></article></div>
+        <div class="account-panel"><div><span id="account-dot" class="dot"></span><span id="account-status">Проверяем подключение Codex…</span></div><button id="auth-codex" class="text-button">Войти в ChatGPT ↗</button></div>
+      </section>
+      <section id="terminal-view" class="terminal-view" hidden><div class="terminal-toolbar"><div><span class="dot"></span> <span id="terminal-title">Codex</span> <span id="terminal-path" class="muted">/workspace</span></div><div class="terminal-tools"><button id="interrupt" title="Прервать текущее действие">Ctrl C</button><button id="escape" title="Escape">Esc</button><button id="enter" title="Enter">↵</button><button id="font-down" title="Уменьшить шрифт">A−</button><button id="font-up" title="Увеличить шрифт">A+</button><button id="close-session" class="danger" title="Завершить сессию">Завершить</button></div></div><div id="terminal"></div><div id="exit-banner" hidden></div></section>
+      <footer><span><span class="dot small"></span> <span id="version">Codex CLI</span></span><span>Tab — дополнить <b>·</b> Ctrl C — прервать <b>·</b> /help — команды</span></footer>
+    </main>
+  </div>
+  <dialog id="create-dialog"><form id="create-form"><div class="dialog-top"><h2>Новая сессия</h2><button type="button" class="text-button" id="cancel-dialog" aria-label="Закрыть">✕</button></div><p class="muted">Выберите инструмент и папку проекта.</p><label for="session-kind">Инструмент</label><select id="session-kind"><option value="codex">Codex — новая задача</option><option value="resume">Codex — продолжить из истории</option><option value="shell">Bash — терминал</option><option value="login">Вход в ChatGPT</option></select><label for="session-cwd">Рабочая папка</label><input id="session-cwd" value="/workspace" required><p class="field-hint">Папка должна существовать внутри /workspace.<br>Создать папку или клонировать репозиторий можно в Bash.</p><p id="create-error" role="alert" class="error"></p><button class="primary" type="submit">Создать сессию <span>↗</span></button></form></dialog>
+  <div id="toast" class="toast" role="alert" hidden></div>
+</body>
+</html>

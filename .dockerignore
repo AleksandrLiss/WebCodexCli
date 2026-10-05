@@ -1,0 +1,16 @@
+.env*
+.git
+.github
+scripts
+docs
+tests
+__pycache__
+.venv
+backups
+dist
+*.tar
+*.tar.gz
+*.zip
+*.log
+*.png
+README.md
