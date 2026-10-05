@@ -2,6 +2,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import stat
 import subprocess
@@ -39,6 +40,30 @@ class DeploymentTests(unittest.TestCase):
         self.env = self.root / '.env'
         self.values = dict(m.DEFAULTS, WEB_PASSWORD='test-password-for-deployment-only')
         self.env.write_text(''.join(f'{k}={v}\n' for k, v in self.values.items()))
+
+    def test_wrappers_run_with_posix_sh_from_another_directory(self):
+        fake_python = self.root / 'python3'
+        fake_python.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
+        fake_python.chmod(0o755)
+        environment = dict(os.environ, PATH=str(self.root) + os.pathsep + os.environ.get('PATH', ''))
+        project = Path(__file__).parents[1]
+        scripts = {
+            'run.sh': ['deploy'],
+            'scripts/start.sh': ['start'],
+            'scripts/stop.sh': ['stop'],
+            'scripts/status.sh': ['status'],
+            'scripts/deploy.sh': ['deploy'],
+            'scripts/update.sh': ['deploy', '--replace'],
+            'scripts/backup.sh': ['backup'],
+            'scripts/restore.sh': ['restore'],
+        }
+        for name, arguments in scripts.items():
+            with self.subTest(script=name):
+                result = subprocess.run(['sh', str(project / name), 'argument with spaces'], cwd=self.root,
+                                        env=environment, check=True, capture_output=True, text=True)
+                forwarded = result.stdout.splitlines()
+                self.assertEqual(Path(forwarded[0]).resolve(), (project / 'scripts/manage.py').resolve())
+                self.assertEqual(forwarded[1:], arguments + ['argument with spaces'])
 
     def test_init_preserves_password_and_private_mode(self):
         with contextlib.redirect_stdout(io.StringIO()) as output:
@@ -95,7 +120,7 @@ class DeploymentTests(unittest.TestCase):
     def test_stop_disables_restart_before_stopping(self):
         with patch.object(m, 'preflight'), patch.object(m, 'inspect', return_value=container(restart='always')), patch.object(m, 'docker') as docker, contextlib.redirect_stdout(io.StringIO()):
             m.stop(self.values)
-        self.assertEqual([c.args for c in docker.call_args_list], [('update', '--restart=no', 'codex-web'), ('stop', '--time', '15', 'codex-web')])
+        self.assertEqual([c.args for c in docker.call_args_list], [('update', '--restart=no', 'codex-web'), ('stop', '--timeout', '15', 'codex-web')])
 
     def test_stop_stopped_container_is_idempotent(self):
         with patch.object(m, 'preflight'), patch.object(m, 'inspect', return_value=container(running=False)), patch.object(m, 'docker') as docker, contextlib.redirect_stdout(io.StringIO()):

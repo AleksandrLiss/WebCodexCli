@@ -139,7 +139,7 @@ def stop(values):
     managed(item, values)
     manual_policy(values, item)
     if item['State']['Running']:
-        docker('stop', '--time', '15', values['CONTAINER_NAME'])
+        docker('stop', '--timeout', '15', values['CONTAINER_NAME'])
     print('Service is stopped. Automatic restart is disabled.')
 
 
@@ -212,7 +212,7 @@ def deploy(values, env_file, skip_build=False, replace=False, dry_run=False):
         previous = values['CONTAINER_NAME'] + '-previous-' + datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S') + '-' + secrets.token_hex(2)
         try:
             if old_running:
-                docker('stop', '--time', '15', values['CONTAINER_NAME'])
+                docker('stop', '--timeout', '15', values['CONTAINER_NAME'])
             docker('rename', values['CONTAINER_NAME'], previous)
         except Exception:
             if old_running:
@@ -269,7 +269,7 @@ def backup(values, env_file, destination):
     was_running = container['State']['Running']
     try:
         if was_running:
-            docker('stop', '--time', '15', values['CONTAINER_NAME'])
+            docker('stop', '--timeout', '15', values['CONTAINER_NAME'])
         for key, filename in [('WORKSPACE_VOLUME', 'workspace.tar.gz'), ('CODEX_HOME_VOLUME', 'codex-home.tar.gz')]:
             path = destination / filename
             with path.open('wb') as output:

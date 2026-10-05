@@ -1,3 +1,3 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 exec python3 "$(dirname -- "$0")/manage.py" deploy --replace "$@"

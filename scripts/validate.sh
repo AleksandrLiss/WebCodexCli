@@ -5,6 +5,9 @@ cd -- "$project_dir"
 for script in run.sh scripts/*.sh; do
   bash -n "$script"
 done
+for script in run.sh scripts/start.sh scripts/stop.sh scripts/status.sh scripts/deploy.sh scripts/update.sh scripts/backup.sh scripts/restore.sh; do
+  sh -n "$script"
+done
 python3 - <<'PY'
 import ast
 from pathlib import Path
