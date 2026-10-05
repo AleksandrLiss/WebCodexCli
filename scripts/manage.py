@@ -350,8 +350,14 @@ def status(values):
     item = inspect(values['CONTAINER_NAME'])
     if not item:
         fail('Container not found')
-    print(json.dumps({'name': values['CONTAINER_NAME'], 'running': item['State']['Running'],
-                      'health': item['State'].get('Health', {}).get('Status'),
+    state = item['State']
+    running = state['Running']
+    paused = bool(state.get('Paused'))
+    # Docker retains the last health result after stop. It is not current health.
+    health = state.get('Health', {}).get('Status') if running and not paused else None
+    service_state = 'paused' if paused else ('running' if running else 'stopped')
+    print(json.dumps({'name': values['CONTAINER_NAME'], 'status': service_state, 'running': running,
+                      'health': health,
                       'restart': item['HostConfig']['RestartPolicy']['Name'],
                       'memoryBytes': item['HostConfig']['Memory'], 'ports': item['HostConfig']['PortBindings']}, indent=2))
 

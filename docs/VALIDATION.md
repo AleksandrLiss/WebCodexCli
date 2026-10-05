@@ -5,7 +5,7 @@
 | Проверка | Результат | Граница проверки |
 | --- | --- | --- |
 | Bash и Python syntax | PASS | `scripts/validate.sh`, включая все deployment scripts |
-| Unit tests | 27 / 27 PASS | Docker заменён test double, без модели и volumes рабочего сервиса |
+| Unit tests | 31 / 31 PASS | Docker заменён test double, без модели и volumes рабочего сервиса |
 | Docker CLI plan | PASS | `deploy --dry-run`, пароль не выводится |
 | Реальный backup/restore | PASS | Уникальные временные Docker volumes и тестовый контейнер |
 | Перезапуск после backup | PASS | Тестовый процесс работал снова после архивации |
@@ -51,3 +51,7 @@
 ## Проверка совместимости с sh
 
 После исправления обёрток прошли 27 unit tests, включая запуск всех восьми обёрток через POSIX `sh` из другого каталога. На текущем сервере успешно выполнены `sh ./scripts/status.sh` и повторная остановка через `sh ./scripts/stop.sh`. Реальный lifecycle-тест временного контейнера также прошёл с новым Docker flag `--timeout`, без предупреждения об устаревшем `--time`. Рабочий сервис оставлен в остановленном владельцем состоянии.
+
+## Проверка отображения статуса
+
+После исправления сохранённого health остановленного контейнера прошли 31 unit test: для stopped/paused health равен `null`, для running остаётся текущим, отсутствие healthcheck допускается. Команда на текущем сервере показала `status=stopped`, `running=false`, `health=null`, `restart=no`. Проверка не меняет состояние контейнера.

@@ -27,7 +27,8 @@ exporter = module('exporter', 'export-source.py')
 def container(running=True, managed=True, restart='no'):
     return {'Config': {'Image': 'codex-web:local', 'Labels': {m.LABEL: 'true'} if managed else {}},
             'State': {'Running': running, 'Health': {'Status': 'healthy'}},
-            'HostConfig': {'RestartPolicy': {'Name': restart}},
+            'HostConfig': {'RestartPolicy': {'Name': restart}, 'Memory': 402653184,
+                           'PortBindings': {'8080/tcp': [{'HostIp': '', 'HostPort': '8080'}]}},
             'Mounts': [{'Destination': '/workspace', 'Name': 'codex-web-workspace'},
                        {'Destination': '/home/codex/.codex', 'Name': 'codex-web-home'}]}
 
@@ -150,6 +151,45 @@ class DeploymentTests(unittest.TestCase):
         with patch.object(m, 'preflight'), patch.object(m, 'inspect', return_value=container(restart='unless-stopped')), patch.object(m, 'docker') as docker, patch.object(m, 'wait_healthy'), contextlib.redirect_stdout(io.StringIO()):
             m.deploy(self.values, self.env)
         docker.assert_called_once_with('update', '--restart=no', 'codex-web')
+
+    def read_status(self, item):
+        with patch.object(m, 'preflight'), patch.object(m, 'inspect', return_value=item), patch.object(m, 'docker') as docker, contextlib.redirect_stdout(io.StringIO()) as output:
+            m.status(self.values)
+        docker.assert_not_called()
+        return json.loads(output.getvalue())
+
+    def test_stopped_status_ignores_stale_health(self):
+        for stale in ['healthy', 'unhealthy', 'starting']:
+            with self.subTest(stale=stale):
+                item = container(running=False)
+                item['State']['Health']['Status'] = stale
+                result = self.read_status(item)
+                self.assertEqual(result['status'], 'stopped')
+                self.assertFalse(result['running'])
+                self.assertIsNone(result['health'])
+
+    def test_running_status_retains_current_health(self):
+        for health in ['healthy', 'unhealthy', 'starting']:
+            with self.subTest(health=health):
+                item = container()
+                item['State']['Health']['Status'] = health
+                result = self.read_status(item)
+                self.assertEqual(result['status'], 'running')
+                self.assertEqual(result['health'], health)
+
+    def test_running_status_without_healthcheck(self):
+        item = container()
+        del item['State']['Health']
+        result = self.read_status(item)
+        self.assertEqual(result['status'], 'running')
+        self.assertIsNone(result['health'])
+
+    def test_paused_status_does_not_report_stale_health(self):
+        item = container()
+        item['State']['Paused'] = True
+        result = self.read_status(item)
+        self.assertEqual(result['status'], 'paused')
+        self.assertIsNone(result['health'])
 
     def test_unrelated_container_is_not_touched(self):
         item = container(managed=False)

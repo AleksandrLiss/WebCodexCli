@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Verify manual lifecycle on a disposable web container, without production volumes."""
 import importlib.util
+import contextlib
+import io
 import json
 from pathlib import Path
 import secrets
@@ -34,8 +36,12 @@ def main():
         item = m.inspect(name)
         assert not item['State']['Running']
         assert item['HostConfig']['RestartPolicy']['Name'] == 'no'
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            m.status(values)
+        stopped = json.loads(output.getvalue())
+        assert stopped['status'] == 'stopped' and stopped['health'] is None
         m.stop(values)
-        print('PASS: real manual start/stop, healthy startup, legacy policy migration, idempotency')
+        print('PASS: real manual start/stop, healthy startup, legacy policy migration, idempotency, stopped status')
     except Exception:
         item = m.inspect(name)
         if item:
