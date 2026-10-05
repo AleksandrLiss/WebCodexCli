@@ -113,6 +113,36 @@ def managed(container, values):
         fail('Refusing to modify an unrelated container with the same name')
 
 
+def manual_policy(values, container):
+    if container['HostConfig']['RestartPolicy']['Name'] != 'no':
+        docker('update', '--restart=no', values['CONTAINER_NAME'])
+
+
+def start(values):
+    preflight()
+    item = inspect(values['CONTAINER_NAME'])
+    if not item:
+        fail('Container not found; run scripts/deploy.sh once to install it')
+    managed(item, values)
+    manual_policy(values, item)
+    if not item['State']['Running']:
+        docker('start', values['CONTAINER_NAME'])
+    wait_healthy(values['CONTAINER_NAME'])
+    print('Service is healthy. Automatic restart is disabled.')
+
+
+def stop(values):
+    preflight()
+    item = inspect(values['CONTAINER_NAME'])
+    if not item:
+        fail('Container not found')
+    managed(item, values)
+    manual_policy(values, item)
+    if item['State']['Running']:
+        docker('stop', '--time', '15', values['CONTAINER_NAME'])
+    print('Service is stopped. Automatic restart is disabled.')
+
+
 def build_command(values):
     return ['build', '--memory=' + values['BUILD_MEMORY_LIMIT'],
             '--memory-swap=' + values['BUILD_MEMORY_LIMIT'], '--cpu-period=100000',
@@ -130,7 +160,7 @@ def run_command(values, env_file):
     if ':' in address:
         address = '[' + address + ']'
     return ['run', '-d', '--name', values['CONTAINER_NAME'], '--label', LABEL + '=true',
-            '--init', '--restart', 'unless-stopped', '-p', f'{address}:{values["WEB_PORT"]}:8080',
+            '--init', '--restart', 'no', '-p', f'{address}:{values["WEB_PORT"]}:8080',
             '--env-file', str(env_file), '--mount', f'source={values["WORKSPACE_VOLUME"]},target=/workspace',
             '--mount', f'source={values["CODEX_HOME_VOLUME"]},target=/home/codex/.codex',
             '--security-opt', 'no-new-privileges:true', '--cap-drop', 'ALL',
@@ -164,6 +194,7 @@ def deploy(values, env_file, skip_build=False, replace=False, dry_run=False):
     old = inspect(values['CONTAINER_NAME'])
     if old:
         managed(old, values)
+        manual_policy(values, old)
         if not replace:
             if not old['State']['Running']:
                 docker('start', values['CONTAINER_NAME'])
@@ -332,6 +363,8 @@ def main():
     sub.add_parser('init-env')
     sub.add_parser('build')
     sub.add_parser('status')
+    sub.add_parser('start')
+    sub.add_parser('stop')
     deploy_parser = sub.add_parser('deploy')
     deploy_parser.add_argument('--skip-build', action='store_true')
     deploy_parser.add_argument('--replace', action='store_true')
@@ -351,7 +384,7 @@ def main():
     dry_run = args.command == 'deploy' and args.dry_run
     if args.command in ('build', 'deploy') and not dry_run and not args.env_file.exists():
         initialize(args.env_file)
-    required = args.command != 'status' and not dry_run
+    required = args.command not in ('status', 'start', 'stop') and not dry_run
     if args.command == 'restore':
         required = not args.use_backup_env
     values = config(args.env_file, password_required=required)
@@ -361,6 +394,10 @@ def main():
         deploy(values, args.env_file, args.skip_build, args.replace, args.dry_run)
     elif args.command == 'status':
         status(values)
+    elif args.command == 'start':
+        start(values)
+    elif args.command == 'stop':
+        stop(values)
     elif args.command == 'backup':
         backup(values, args.env_file, args.destination.resolve())
     elif args.command == 'restore':

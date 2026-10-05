@@ -11,7 +11,7 @@ codex-web/
 ├── requirements.lock           # Снимок всех Python-зависимостей
 ├── download-assets.py          # Зафиксированные npm-компоненты
 ├── .env.example                # Шаблон без пароля
-├── scripts/                    # Deploy, update, backup, restore, export, validate
+├── scripts/                    # Start, stop, status, deploy, update, backup, restore, export, validate
 ├── tests/                      # Проверки скриптов и HTTP/PTY smoke
 └── docs/                       # Техническая документация
 ```
@@ -54,7 +54,7 @@ git ls-files .env auth.json
 ./scripts/validate.sh
 ```
 
-Проверяются синтаксис Bash/Python и сценарии скриптов: сохранение пароля, права 600, literal dotenv, idempotent deploy, порядок сборки и остановки, rollback, возврат сервиса при ошибке backup, checksums, запрет перезаписи и очистка экспортируемых исходников. Docker в unit tests заменён test double; настоящие containers, volumes и модель не используются.
+Проверяются синтаксис Bash/Python и сценарии скриптов: сохранение пароля, права 600, literal dotenv, idempotent start/stop/deploy, отключение legacy restart policy, порядок сборки и остановки, rollback, возврат сервиса при ошибке backup, checksums, запрет перезаписи и очистка экспортируемых исходников. Docker в unit tests заменён test double; настоящие containers, volumes и модель не используются.
 
 Если Node отсутствует на хосте, проверить клиент можно в имеющемся образе:
 
@@ -86,6 +86,14 @@ python3 tests/integration-storage.py
 ```
 
 Она использует имеющийся образ, фиксированные малые лимиты и уникальные имена `codex-web-storage-test-*`, не подключает volumes рабочего приложения и удаляет собственные тестовые ресурсы в finally.
+
+Проверка ручного start/stop на отдельном временном web-контейнере:
+
+```bash
+python3 tests/integration-manual.py
+```
+
+Тест использует 96 МБ RAM и 0.5 CPU, не подключает production volumes и не публикует порты. Проверяет переход со старой restart policy, healthcheck и повторяемость команд; обращения к модели отсутствуют.
 
 ## Изменения и версии
 

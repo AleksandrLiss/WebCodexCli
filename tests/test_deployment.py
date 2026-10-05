@@ -23,9 +23,10 @@ m = module('manage', 'manage.py')
 exporter = module('exporter', 'export-source.py')
 
 
-def container(running=True, managed=True):
+def container(running=True, managed=True, restart='no'):
     return {'Config': {'Image': 'codex-web:local', 'Labels': {m.LABEL: 'true'} if managed else {}},
             'State': {'Running': running, 'Health': {'Status': 'healthy'}},
+            'HostConfig': {'RestartPolicy': {'Name': restart}},
             'Mounts': [{'Destination': '/workspace', 'Name': 'codex-web-workspace'},
                        {'Destination': '/home/codex/.codex', 'Name': 'codex-web-home'}]}
 
@@ -79,6 +80,51 @@ class DeploymentTests(unittest.TestCase):
         with patch.object(m, 'preflight'), patch.object(m, 'inspect', return_value=container()), patch.object(m, 'docker') as docker, patch.object(m, 'wait_healthy'), contextlib.redirect_stdout(io.StringIO()):
             m.deploy(self.values, self.env)
         docker.assert_not_called()
+
+    def test_start_migrates_old_policy_and_starts_existing_container(self):
+        with patch.object(m, 'preflight'), patch.object(m, 'inspect', return_value=container(running=False, restart='unless-stopped')), patch.object(m, 'docker') as docker, patch.object(m, 'wait_healthy') as healthy, contextlib.redirect_stdout(io.StringIO()):
+            m.start(self.values)
+        self.assertEqual([c.args for c in docker.call_args_list], [('update', '--restart=no', 'codex-web'), ('start', 'codex-web')])
+        healthy.assert_called_once_with('codex-web')
+
+    def test_start_running_container_is_idempotent(self):
+        with patch.object(m, 'preflight'), patch.object(m, 'inspect', return_value=container()), patch.object(m, 'docker') as docker, patch.object(m, 'wait_healthy'), contextlib.redirect_stdout(io.StringIO()):
+            m.start(self.values)
+        docker.assert_not_called()
+
+    def test_stop_disables_restart_before_stopping(self):
+        with patch.object(m, 'preflight'), patch.object(m, 'inspect', return_value=container(restart='always')), patch.object(m, 'docker') as docker, contextlib.redirect_stdout(io.StringIO()):
+            m.stop(self.values)
+        self.assertEqual([c.args for c in docker.call_args_list], [('update', '--restart=no', 'codex-web'), ('stop', '--time', '15', 'codex-web')])
+
+    def test_stop_stopped_container_is_idempotent(self):
+        with patch.object(m, 'preflight'), patch.object(m, 'inspect', return_value=container(running=False)), patch.object(m, 'docker') as docker, contextlib.redirect_stdout(io.StringIO()):
+            m.stop(self.values)
+        docker.assert_not_called()
+
+    def test_start_does_not_deploy_missing_container(self):
+        with patch.object(m, 'preflight'), patch.object(m, 'inspect', return_value=None), patch.object(m, 'docker') as docker:
+            with self.assertRaisesRegex(RuntimeError, 'not found'):
+                m.start(self.values)
+        docker.assert_not_called()
+
+    def test_manual_actions_do_not_touch_unrelated_container(self):
+        item = container(managed=False)
+        item['Config']['Image'] = 'another-service:latest'
+        for action in [m.start, m.stop]:
+            with patch.object(m, 'preflight'), patch.object(m, 'inspect', return_value=item), patch.object(m, 'docker') as docker:
+                with self.assertRaises(RuntimeError):
+                    action(self.values)
+            docker.assert_not_called()
+
+    def test_new_container_never_automatically_restarts(self):
+        args = m.run_command(self.values, self.env)
+        self.assertEqual(args[args.index('--restart') + 1], 'no')
+
+    def test_existing_deploy_disables_legacy_restart(self):
+        with patch.object(m, 'preflight'), patch.object(m, 'inspect', return_value=container(restart='unless-stopped')), patch.object(m, 'docker') as docker, patch.object(m, 'wait_healthy'), contextlib.redirect_stdout(io.StringIO()):
+            m.deploy(self.values, self.env)
+        docker.assert_called_once_with('update', '--restart=no', 'codex-web')
 
     def test_unrelated_container_is_not_touched(self):
         item = container(managed=False)

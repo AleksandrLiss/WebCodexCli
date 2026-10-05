@@ -5,7 +5,7 @@ services:
     labels:
       io.codex-web.managed: "true"
     init: true
-    restart: unless-stopped
+    restart: "no"
     ports:
       - "${WEB_BIND_ADDRESS:-0.0.0.0}:${WEB_PORT:-8080}:8080"
     env_file: .env

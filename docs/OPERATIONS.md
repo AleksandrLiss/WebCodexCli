@@ -2,20 +2,23 @@
 
 Примеры ниже используют стандартные имена и выполняются из корня проекта. Для нестандартного env-файла используйте `python3 scripts/manage.py --env-file PATH <command>`.
 
-## Запуск, остановка и автозапуск
+## Ручной запуск и остановка
 
 ```bash
-python3 scripts/manage.py status
+./scripts/start.sh
+./scripts/stop.sh
+./scripts/status.sh
 docker logs --tail 100 codex-web
 docker stats --no-stream codex-web
-docker restart codex-web
-docker stop codex-web
-docker start codex-web
 ```
 
-Docker должен быть включён в systemd: `systemctl is-enabled docker`. Контейнер настроен на `restart: unless-stopped`: после перезагрузки VDS запускается автоматически, если до этого не был вручную остановлен. Ручной `docker stop` сохраняет остановку после перезагрузки; выполнить `docker start` нужно явно.
+Контейнер настроен на `restart: "no"`: после перезагрузки ОС или перезапуска Docker сервис автоматически не запускается. После входа на сервер выполните `./scripts/start.sh`. Команды доступны по абсолютному пути, например `/root/codex-web/scripts/start.sh`, и не зависят от текущего каталога. Для непривилегированного пользователя может потребоваться `sudo`.
 
-Перезапуск завершает активные PTY-процессы и отзывает web-cookie. Рабочие файлы и история CLI сохраняются в named volumes. Healthcheck сообщает о состоянии HTTP-сервера; Docker сам по себе не перезапускает контейнер только из-за состояния unhealthy.
+Start запускает существующий контейнер, не пересобирает образ и ждёт healthcheck до 60 секунд. Stop останавливает контейнер с grace period 15 секунд, не удаляя его или volumes. Повторные команды не пересоздают контейнер. Оба скрипта проверяют принадлежность контейнера проекту и отключают старую restart policy, если она ещё была включена.
+
+Docker daemon может запускаться с ОС, но приложение остаётся остановленным до ручного старта. После падения процесса или OOM контейнер тоже не перезапускается автоматически; восстановление выполняет владелец через start. Проверка состояния: `./scripts/status.sh`.
+
+Остановка завершает активные PTY-процессы и отзывает web-cookie. Рабочие файлы и история CLI сохраняются в named volumes. Healthcheck сообщает о состоянии HTTP-сервера; Docker не перезапускает контейнер только из-за состояния unhealthy.
 
 ## Обновление
 
@@ -37,7 +40,7 @@ git pull --ff-only
 ./scripts/update.sh --skip-build
 ```
 
-Не запускайте параллельно несколько deploy/update/backup/restore для одного окружения. Выберите единый способ управления: CLI-скрипты или Docker Compose. Compose не предоставляет автоматический откат, описанный выше.
+Не запускайте параллельно несколько start/stop/deploy/update/backup/restore для одного окружения. Выберите единый способ управления: CLI-скрипты или Docker Compose. Compose не предоставляет автоматический откат, описанный выше. Deploy/update запускают контейнер по явной команде владельца; restart policy остаётся `no`, в том числе после rollback.
 
 ## Ручной откат
 
@@ -128,7 +131,8 @@ docker exec codex-web codex login status
 | Нет ответа модели | `codex login status`, реальный ответ CLI, доступность сети и выбранной модели |
 | Sandbox не запускает команду | Проверить user namespaces/seccomp хоста; обработать запрос подтверждения CLI |
 | Контейнер неожиданно перезапустился | `docker inspect codex-web`, `State.OOMKilled`, логи и лимиты RAM/PIDs |
-| Docker после ребута выключен | `systemctl is-enabled docker`, `systemctl status docker` |
+| Приложение после ребута остановлено | Штатный ручной режим; выполнить `./scripts/start.sh` |
+| Docker daemon недоступен | `systemctl status docker`; при необходимости запустить Docker |
 | Restore отказывается работать | Корректные SHA-256, новый контейнер/пустые volumes, доверенные archive members |
 | Legacy builder недоступен | Собрать образ на другой машине и перенести через `export-image.sh` |
 

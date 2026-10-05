@@ -38,6 +38,16 @@ curl -f http://127.0.0.1:8080/healthz
 
 Порядок deploy: проверить Docker → собрать образ с ограничениями → создать volumes → запустить контейнер → дождаться healthcheck до 60 секунд. Повторный deploy здорового существующего контейнера не вызывает пересборку и пересоздание. Для обновления используйте `update.sh`.
 
+Первый deploy запускает приложение как часть явно запрошенной установки. Автозапуск контейнера отключён (`restart=no`). После каждой перезагрузки ОС запуск выполняется вручную:
+
+```bash
+sudo ./scripts/start.sh
+sudo ./scripts/stop.sh
+sudo ./scripts/status.sh
+```
+
+Эти команды используют установленный контейнер, не собирают образ и не меняют пароль. Start/stop в старой установке также отключают ранее установленную автоматическую restart policy.
+
 Откройте `http://<IP-сервера>:8080`, введите `WEB_PASSWORD` из `.env`. Нажмите «Войти в ChatGPT» и следуйте инструкциям терминала. При доступе через NAT или firewall провайдера входящий TCP-порт должен быть разрешён. Настройки firewall скрипты не меняют.
 
 ## Вариант 2. Установка из архива исходников
@@ -116,6 +126,8 @@ python3 scripts/manage.py init-env
 python3 scripts/manage.py --env-file /etc/codex-web/instance.env init-env
 python3 scripts/manage.py --env-file /etc/codex-web/instance.env deploy
 python3 scripts/manage.py --env-file /etc/codex-web/instance.env status
+python3 scripts/manage.py --env-file /etc/codex-web/instance.env start
+python3 scripts/manage.py --env-file /etc/codex-web/instance.env stop
 ```
 
 Shell-обёртки используют `.env` в корне проекта. Для нестандартного env-файла вызывайте `manage.py` напрямую.
